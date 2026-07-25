@@ -1,3 +1,8 @@
+import os
+
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("USE_TORCH", "1")
+
 from transformers import pipeline
 from .schemas import (
     ClaimNormalization,
@@ -25,17 +30,40 @@ def run_nli(
     and one evidence passage.
     """
 
-    result = nli_pipeline(
-        {
-            "text": evidence.cleaned,
-            "text_pair": claim.normalized,
-        }
-    )[0]
+    evidence_text = (
+        evidence.cleaned or evidence.text or evidence.raw_text or evidence.title or ""
+    ).strip()
+    claim_text = (
+        claim.normalized or claim.cleaned or claim.original or ""
+    ).strip()
 
-    label = result["label"].upper()
+    if not evidence_text or not claim_text:
+        return NLIResult(
+            evidence=evidence,
+            label="NEI",
+            confidence=0.0,
+        )
+
+    raw = nli_pipeline(
+        {
+            "text": evidence_text,
+            "text_pair": claim_text,
+        },
+        truncation=True,
+        max_length=512,
+    )
+
+    if isinstance(raw, list) and len(raw) > 0:
+        result = raw[0]
+    elif isinstance(raw, dict):
+        result = raw
+    else:
+        result = {"label": "NEUTRAL", "score": 0.0}
+
+    label = str(result.get("label", "NEUTRAL")).upper()
 
     return NLIResult(
         evidence=evidence,
         label=LABEL_MAP.get(label, label),
-        confidence=result["score"],
+        confidence=float(result.get("score", 0.0)),
     )

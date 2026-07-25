@@ -1,4 +1,7 @@
-"""Embedding helpers for claims and evidence."""
+import os
+
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("USE_TORCH", "1")
 
 import numpy as np
 from django.conf import settings

@@ -91,6 +91,13 @@ def build_verification_url(request, user):
     return request.build_absolute_uri("/api/user/verify-email/") + f"?uid={uid}&token={token}"
 
 
+def redirect_to_login(**params):
+    """Return browser-based authentication flows to the frontend login page."""
+    return redirect(
+        f"{settings.FRONTEND_LOGIN_URL}?{urllib.parse.urlencode(params)}"
+    )
+
+
 def send_verification_email(request, user):
     return send_account_email(
         user,
@@ -131,15 +138,12 @@ class VerifyEmailView(APIView):
         serializer.is_valid(raise_exception=True)
         user = get_user_from_token(**serializer.validated_data)
         if not user:
-            return Response(
-                {"detail": "Invalid or expired verification link."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return redirect_to_login(verification="invalid")
 
         if not user.is_verified:
             user.is_verified = True
             user.save(update_fields=["is_verified"])
-        return Response({"detail": "Email verified successfully."})
+        return redirect_to_login(verification="success")
 
 
 class ResendVerificationView(APIView):
@@ -480,7 +484,7 @@ class GoogleCallbackView(APIView):
         user_info = user_info_response.json()
 
         email = user_info.get("email")
-        print(user_info)
+        logger.debug("Received Google profile for OAuth login.")
         if not email:
             return Response(
                 {"detail": "Google profile did not include an email."},
@@ -509,17 +513,18 @@ class GoogleCallbackView(APIView):
             user.save(update_fields=["is_verified"])
 
         refresh = RefreshToken.for_user(user)
-        
-        return Response({
-            "access_token":
-            str(refresh.access_token),
+        access_token_str = str(refresh.access_token)
+        refresh_token_str = str(refresh)
 
-            "refresh_token":
-            str(refresh),
+        redirect_url = (
+            f"{settings.FRONTEND_OAUTH_SUCCESS_URL}?"
+            + urllib.parse.urlencode(
+                {
+                    "access_token": access_token_str,
+                    "refresh_token": refresh_token_str,
+                }
+            )
+        )
 
-            "user": {
-                "email": user.email,
-                "username": user.username,
-                "is_verified": user.is_verified,
-            },
-        })
+        return redirect(redirect_url)
+

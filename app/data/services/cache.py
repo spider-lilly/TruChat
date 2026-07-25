@@ -1,5 +1,4 @@
-"""Redis Stack vector cache for completed claim evaluations."""
-
+import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -16,6 +15,7 @@ from .schemas import ClaimNormalization, ScoreResult
 if TYPE_CHECKING:
     from ..models import Claim
 
+logger = logging.getLogger(__name__)
 
 INDEX_NAME = "idx:claim_cache"
 KEY_PREFIX = "claim:"
@@ -46,7 +46,7 @@ def create_vector_index():
             client.ft(INDEX_NAME).info()
             return
         except ResponseError as e:
-            if "Unknown Index name" not in str(e):
+            if "unknown index name" not in str(e).lower():
                 raise
 
         client.ft(INDEX_NAME).create_index(
@@ -117,7 +117,8 @@ def check_cache(
             explanation=cached.explanation,
         )
     except Exception as e:
-        raise RuntimeError("Unable to search Redis vector cache.") from e
+        logger.warning("Redis cache unavailable or search failed: %s", e)
+        return None
 
 
 def store_cache(
@@ -147,7 +148,7 @@ def store_cache(
             },
         )
     except Exception as e:
-        raise RuntimeError("Unable to store result in Redis cache.") from e
+        logger.warning("Failed to store result in Redis cache: %s", e)
 
 
 def delete_cache(claim_id):
@@ -156,7 +157,7 @@ def delete_cache(claim_id):
         client = get_redis_client()
         client.delete(f"{KEY_PREFIX}{claim_id}")
     except Exception as e:
-        raise RuntimeError(f"Unable to delete cache entry for claim {claim_id}.") from e
+        logger.warning("Failed to delete cache entry for claim %s: %s", claim_id, e)
 
 
 def clear_cache():
@@ -167,4 +168,4 @@ def clear_cache():
         if keys:
             client.delete(*keys)
     except Exception as e:
-        raise RuntimeError("Unable to clear Redis cache.") from e
+        logger.warning("Failed to clear Redis cache: %s", e)

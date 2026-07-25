@@ -15,6 +15,10 @@ from datetime import timedelta
 from pathlib import Path
 import os
 
+# Disable TensorFlow backend in HuggingFace transformers to prevent Protobuf/Keras/TF version errors
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
 import dj_database_url
 from dotenv import load_dotenv
 
@@ -61,8 +65,8 @@ GDELT_BASE_URL = os.getenv(
     "GDELT_BASE_URL",
     "https://api.gdeltproject.org/api/v2/doc/doc"
 )
-LLM_MODEL = "grok-4"
-API_KEY = os.getenv("API_KEY")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+API_KEY = os.getenv("LLM_KEY") or os.getenv("API_KEY") or os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -78,6 +82,10 @@ EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "1024"))
 CACHE_SIMILARITY_THRESHOLD = float(
     os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.92")
 )
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_LOGIN_URL = os.getenv("FRONTEND_LOGIN_URL", "http://localhost:5173/login")
+FRONTEND_OAUTH_SUCCESS_URL = os.getenv("FRONTEND_OAUTH_SUCCESS_URL", "http://localhost:5173/oauth-success")
 
 
 ALLOWED_HOSTS = [

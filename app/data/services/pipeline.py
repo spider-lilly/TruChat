@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import logging
 
 from django.db import transaction
@@ -78,7 +79,7 @@ def process_claim(
     claim.normalized_claim = normalized.normalized
     claim.canonical_claim = normalized.canonical
     claim.fingerprint = normalized.fingerprint
-    claim.entities = normalized.entities.__dict__
+    claim.entities = asdict(normalized.entities)
     claim.keywords = normalized.keywords
     claim.numbers = normalized.numbers
     claim.dates = normalized.dates
@@ -100,11 +101,8 @@ def process_claim(
             claim_embedding,
         )
     except Exception as e:
-        _pipeline_error(
-            claim,
-            "check_cache",
-            e,
-        )
+        logger.warning("Redis cache check failed, proceeding with full pipeline: %s", e)
+        cached_result = None
 
     if cached_result is not None:
         try:

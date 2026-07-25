@@ -6,6 +6,8 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    os.environ.setdefault('USE_TF', '0')
+    os.environ.setdefault('USE_TORCH', '1')
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     try:
         from django.core.management import execute_from_command_line

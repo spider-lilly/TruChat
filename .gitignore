@@ -1,7 +1,38 @@
+# Python & Byte-compiled files
 __pycache__/
 *.py[cod]
-db.sqlite3
+*$py.class
+
+# Environment Variables & Secrets
 .env
-.venv/
+app/.env
+TruChat/.env
+*.env
+
+# SQLite Databases
+db.sqlite3
+app/db.sqlite3
+*.sqlite3
+
+# Virtual Environments
 venv/
-media/
+.venv/
+env/
+ENV/
+
+# Node & Frontend dependencies/build
+node_modules/
+TruChat/node_modules/
+dist/
+TruChat/dist/
+build/
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Archives & Temporary files
+*.zip
+app.zip

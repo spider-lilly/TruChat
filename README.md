@@ -1,27 +1,44 @@
 # TruChat - AI Fact-Checking Platform & Verification Bureau
 
-TruChat is an end-to-end AI Fact-Checking application featuring a **Django REST Framework** backend and a modern **Vite + React** editorial frontend.
+TruChat is a production-grade AI Fact-Checking application featuring a **Django REST Framework** microservice backend and a modern **Vite + React + Tailwind CSS** editorial frontend ("AI Editorial Division" interface).
 
 ---
 
 ## 📁 Repository Structure
 
-- `app/`: Django REST Framework backend service handling authentication, claims database, and AI fact-checking pipeline.
-- `TruChat/`: Vite + React + Tailwind CSS frontend application ("AI Editorial Division" interface).
-- `requirements.txt`: Python package dependencies.
-- `TruChat_Integration_Plan.md`: Technical specification and API architecture document.
+```
+check/
+├── app/                           # Django REST Framework Backend
+│   ├── config/                    # Settings, ASGI/WSGI, and global URLs
+│   ├── data/                      # Claim processing pipeline, schemas, & models
+│   │   ├── services/
+│   │   │   ├── clean.py           # Text cleaning & HTML/Markdown stripping
+│   │   │   ├── normalize.py       # Claim entity/keyword normalization
+│   │   │   ├── embedding.py       # SentenceTransformer vector embeddings
+│   │   │   ├── search.py          # Multi-source search (Tavily, Wikipedia, Wikidata, GDELT)
+│   │   │   ├── nli.py             # DeBERTa-v3 NLI zero-shot classification
+│   │   │   ├── scoring.py         # Signal-priority verdict aggregation & LLM/rule scoring
+│   │   │   ├── cache.py           # Optional Redis Stack vector cache
+│   │   │   └── pipeline.py        # End-to-end claim check orchestrator
+│   └── user/                      # Authentication & profile management (JWT & Google OAuth)
+├── TruChat/                       # Vite + React + Tailwind CSS Frontend
+├── requirements.txt               # Backend Python dependencies
+├── .gitignore                     # Git exclusion rules
+└── README.md                      # Documentation
+```
 
 ---
 
-## 🚀 Local Development Setup
+## 🚀 Quick Start Guide
 
 ### 1. Backend Setup (`app/`)
 
-1. Open a terminal in the root directory:
+1. Open a terminal in the project root directory:
    ```bash
-   # Create and activate Python virtual environment
+   # Create Python virtual environment
    python -m venv venv
    
+   # Activate virtual environment
    # Windows:
    venv\Scripts\activate
    # Linux/macOS:
@@ -29,13 +46,28 @@ TruChat is an end-to-end AI Fact-Checking application featuring a **Django REST 
 
    # Install dependencies
    pip install -r requirements.txt
+
+   # Download SpaCy language model (if required)
+   python -m spacy download en_core_web_sm
    ```
 
 2. Configure environment variables in `app/.env`:
    ```env
    SECRET_KEY=dev-secret-key-change-in-production
    DEBUG=True
-   CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
+   CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+   # LLM Provider Configuration (Supports Groq, xAI, OpenAI, Gemini, or OpenRouter)
+   # Groq (Free & Fast):
+   API_KEY=gsk_your_groq_api_key_here
+   LLM_MODEL=llama-3.3-70b-versatile
+
+   # Search API Providers
+   TAVILY_API_KEY=your_tavily_api_key_here
+
+   # Optional Redis Vector Cache (Pipeline works automatically if Redis is offline)
+   REDIS_HOST=localhost
+   REDIS_PORT=6379
    ```
 
 3. Run migrations and start the Django server:
@@ -65,45 +97,51 @@ TruChat is an end-to-end AI Fact-Checking application featuring a **Django REST 
    ```bash
    npm run dev
    ```
-   The application will be available at `http://localhost:5173`.
+   The web application will be accessible at `http://localhost:5173`.
 
 ---
 
-## 📡 API Endpoint Overview
+## 🤖 Supported LLM Providers for Fact Scoring
 
-### User Authentication (`/api/user/`)
-- `POST /api/user/register/`: Register a new account (`{ email, username, password }`).
-- `POST /api/user/login/`: Login and receive JWT access/refresh token pair (`{ email, password }`).
-- `POST /api/user/logout/`: Logout and blacklist token (`{ refresh_token }`).
-- `GET /api/user/profile/`: Fetch profile of authenticated user (`Header: Authorization: Bearer <token>`).
+The scoring engine dynamically auto-detects your API key type and routes to the appropriate provider:
+
+| Provider | Key Format | Default Model | Base URL |
+| :--- | :--- | :--- | :--- |
+| **Groq (Free Tier)** | `gsk_...` | `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` |
+| **xAI Grok** | `xai-...` | `grok-2-1212` | `https://api.x.ai/v1` |
+| **Google Gemini** | `AIzaSy...` | `gemini-1.5-flash` | `https://generativelanguage.googleapis.com/v1beta/openai/` |
+| **OpenRouter (Free)** | `sk-or-...` | `meta-llama/llama-3.2-3b-instruct:free` | `https://openrouter.ai/api/v1` |
+| **OpenAI** | `sk-...` | `gpt-4o-mini` | `https://api.openai.com/v1` |
+
+*(Note: If no API key is set or an LLM call fails, the system automatically uses signal-priority NLI rule-based scoring without interrupting request handling.)*
+
+---
+
+## 📡 API Endpoint Reference
+
+### Authentication (`/api/user/`)
+- `POST /api/user/register/`: Register user (`{ email, username, password }`).
+- `POST /api/user/login/`: Obtain JWT access/refresh token pair (`{ email, password }`).
+- `POST /api/user/logout/`: Blacklist token (`{ refresh_token }`).
+- `GET /api/user/profile/`: Fetch profile (`Authorization: Bearer <token>`).
 - `PATCH /api/user/profile/update/`: Update profile details.
-- `POST /api/user/change-password/`: Update user password.
-- `POST /api/user/forgot-password/`: Request password reset email.
-- `POST /api/user/reset-password/`: Reset user password.
-- `DELETE /api/user/delete-account/`: Delete account.
+- `POST /api/user/change-password/`: Change password.
 
 ### Claim Verification (`/api/data/`)
-- `POST /api/data/claims/check/`: Submit news claim for AI fact-checking verification (`{ claim_text: "..." }`).
+- `POST /api/data/claims/check/`: Submit claim text for fact-checking (`{ claim_text: "..." }`).
   - Response:
     ```json
     {
       "verdict": "SUPPORTS",
       "confidence_score": 0.94,
-      "credibility_score": 0.91,
-      "explanation": "The available evidence supports the claim."
+      "credibility_score": 0.83,
+      "explanation": "Based on evaluation of 6 evidence source(s)..."
     }
     ```
 
 ---
 
-## 🎨 UI Features (PDF Specification Alignment)
+## 🔒 Production & Security
 
-- **Editorial Newspaper Design System**: Cream background (`#F7F4ED`), serif typography, crisp newspaper borders.
-- **Interactive Dashboard**:
-  - Live Bureau Counter & `How It Works` instructions card.
-  - Verdict Counters (`VERIFIED`, `UNVERIFIED`, `MISLEADING`).
-  - Quick-select example claims.
-  - Keyboard shortcuts (`ENTER` submit / `SHIFT+ENTER` newline).
-  - Attach image/link modal popover.
-- **Detailed Verdict Reports**: Visual credibility & confidence progress meters with AI explanation breakdown.
-- **User Profile Page**: Account details, verification badge, member since date, and logout actions.
+- Environment secrets (`.env`), SQLite databases (`*.sqlite3`), and Node dependencies (`node_modules/`) are strictly excluded via `.gitignore`.
+- Password verification using Django auth handlers and SimpleJWT blacklisting.
