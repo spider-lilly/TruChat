@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #f5f1e8;
+  --color-ink: #111111;
+  --color-border: #2b2b2b;
+  --color-muted: #555555;
+  --color-accent: #8b0000;
+  --color-hover: #3a3a3a;
+
+  --font-masthead: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-serif: 'Cormorant Garamond', 'Libre Baskerville', Georgia, serif;
+  --font-body: 'Inter', 'Source Sans Pro', system-ui, sans-serif;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    background-color: var(--color-paper);
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+}
+
+@layer utilities {
+  .font-masthead {
+    font-family: var(--font-masthead);
+  }
+
+  .font-editorial {
+    font-family: var(--font-serif);
+  }
+
+  .font-body {
+    font-family: var(--font-body);
+  }
+
+  .paper-texture {
+    background-color: var(--color-paper);
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.12) 0%,
+        rgba(0, 0, 0, 0.02) 100%
+      );
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.7s ease-out both;
+  }
+
+  .animate-fade-in-delay {
+    animation: fade-in 0.9s ease-out 0.15s both;
+  }
+
+  .animate-fade-in-delay-2 {
+    animation: fade-in 1s ease-out 0.3s both;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
