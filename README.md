@@ -170,7 +170,9 @@ python manage.py runserver
 ## 👥 Team
 
 - Darshil Agarwal
-- *(Add Team Members)*
+- Maulya Shetty
+- Maansi Dasmohapatra
+- Sayan Malik
 
 ---
 
