@@ -24,13 +24,20 @@ KEY_PREFIX = "claim:"
 def get_redis_client():
     """Create and verify a Redis Stack client from Django settings."""
     try:
-        client = redis.Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            db=settings.REDIS_DB,
-            password=settings.REDIS_PASSWORD or None,
-            decode_responses=False,
-        )
+        if settings.REDIS_URL:
+            client = redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=False,
+            )
+        else:
+            client = redis.Redis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                db=settings.REDIS_DB,
+                password=settings.REDIS_PASSWORD or None,
+                decode_responses=False,
+            )
+
         client.ping()
         return client
     except Exception as e:
