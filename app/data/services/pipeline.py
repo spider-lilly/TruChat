@@ -1,6 +1,7 @@
 from dataclasses import asdict
 import logging
 
+from django.conf import settings
 from django.db import transaction
 
 from .cache import check_cache, store_cache
@@ -22,6 +23,40 @@ from ..models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _select_evidence(evidence):
+    """Deduplicate results and retain a small, source-diverse evidence set."""
+    unique = []
+    seen_urls = set()
+    for item in evidence:
+        url = (item.url or "").strip().lower()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        unique.append(item)
+
+    # Take one result from each source before taking additional results. This
+    # avoids a single search provider consuming the entire LLM budget.
+    selected = []
+    remaining = list(unique)
+    while remaining and len(selected) < settings.MAX_EVIDENCE_PER_CLAIM:
+        seen_sources = set()
+        next_round = []
+        for item in remaining:
+            if item.source in seen_sources:
+                next_round.append(item)
+                continue
+            selected.append(item)
+            seen_sources.add(item.source)
+            if len(selected) == settings.MAX_EVIDENCE_PER_CLAIM:
+                break
+        else:
+            remaining = next_round
+            continue
+        break
+
+    return selected
 
 
 def _pipeline_error(claim, stage, error):
@@ -122,6 +157,8 @@ def process_claim(
         evidence = search_claim(normalized)
     except Exception as e:
         _pipeline_error(claim, "search_claim", e)
+
+    evidence = _select_evidence(evidence)
 
     """Normalize Evidence"""
     normalized_evidence = []

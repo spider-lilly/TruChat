@@ -61,10 +61,21 @@ WIKIPEDIA_RESULTS = 3
 SEARCH_WORKERS = 4
 SEARCH_TIMEOUT = 15
 TAVILY_SEARCH_DEPTH = "advanced"
+# Keep per-claim LLM usage bounded.  These can be raised through environment
+# variables when a deployment needs more evidence or longer passages.
+MAX_EVIDENCE_PER_CLAIM = int(os.getenv("MAX_EVIDENCE_PER_CLAIM", "8"))
+NLI_MAX_INPUT_CHARS = int(os.getenv("NLI_MAX_INPUT_CHARS", "2400"))
+EMBEDDING_MAX_INPUT_CHARS = int(os.getenv("EMBEDDING_MAX_INPUT_CHARS", "2400"))
+NLI_MAX_OUTPUT_TOKENS = int(os.getenv("NLI_MAX_OUTPUT_TOKENS", "64"))
+NORMALIZATION_MAX_OUTPUT_TOKENS = int(
+    os.getenv("NORMALIZATION_MAX_OUTPUT_TOKENS", "512")
+)
+SCORING_MAX_OUTPUT_TOKENS = int(os.getenv("SCORING_MAX_OUTPUT_TOKENS", "256"))
 GDELT_BASE_URL = os.getenv(
     "GDELT_BASE_URL",
     "https://api.gdeltproject.org/api/v2/doc/doc"
 )
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 API_KEY = os.getenv("LLM_KEY") or os.getenv("API_KEY") or os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
@@ -209,6 +220,9 @@ EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", False)
 # providers used by data.services.search expose public read-only endpoints.
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 SEARCH_HTTP_TIMEOUT = int(os.getenv("SEARCH_HTTP_TIMEOUT", "15"))
+GDELT_MAX_RECORDS = int(os.getenv("GDELT_MAX_RECORDS", "5"))
+GDELT_TIMESPAN = os.getenv("GDELT_TIMESPAN", "30d")
+GDELT_RETRIES = int(os.getenv("GDELT_RETRIES", "1"))
 SEARCH_USER_AGENT = os.getenv(
     "SEARCH_USER_AGENT", "TruChatClaimVerifier/1.0 (contact@example.com)"
 )

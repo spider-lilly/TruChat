@@ -1,5 +1,6 @@
 import logging
-import os
+import time
+
 import requests
 import wikipediaapi
 from concurrent.futures import ThreadPoolExecutor
@@ -25,7 +26,7 @@ wiki = wikipediaapi.Wikipedia(
 
 def _get_tavily_client():
     """Retrieve Tavily client if API key is configured."""
-    api_key = getattr(settings, "TAVILY_API_KEY", None) or os.getenv("TAVILY_API_KEY")
+    api_key = getattr(settings, "TAVILY_API_KEY", None)
     if not api_key or api_key.startswith("replace-with"):
         return None
     return TavilyClient(api_key=api_key)
@@ -33,40 +34,65 @@ def _get_tavily_client():
 
 def _search_gdelt(query: str) -> list[Evidence]:
     """Search GDELT DOC API and return Evidence objects."""
-    try:
-        url = settings.GDELT_BASE_URL
-        params = {
-            "query": query,
-            "mode": "ArtList",
-            "format": "json",
-            "maxrecords": settings.SEARCH_RESULTS_PER_SOURCE,
-        }
-        headers = {"User-Agent": HTTP_USER_AGENT}
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+    url = settings.GDELT_BASE_URL
+    params = {
+        "query": query,
+        "mode": "ArtList",
+        "format": "json",
+        "maxrecords": settings.GDELT_MAX_RECORDS,
+        "timespan": settings.GDELT_TIMESPAN,
+    }
+    headers = {"User-Agent": HTTP_USER_AGENT}
+
+    for attempt in range(settings.GDELT_RETRIES + 1):
+        try:
+            response = requests.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=(3.05, settings.SEARCH_HTTP_TIMEOUT),
+            )
+        except requests.Timeout:
+            if attempt < settings.GDELT_RETRIES:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            logger.warning(
+                "GDELT search timed out after %s attempt(s).", attempt + 1
+            )
+            return []
+        except requests.RequestException as e:
+            logger.warning("GDELT search request failed: %s", e)
+            return []
 
         if response.status_code != 200:
             logger.warning("GDELT search returned status %s", response.status_code)
             return []
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            logger.warning("GDELT search returned a non-JSON response.")
+            return []
+
         evidence = []
 
         for article in data.get("articles", []):
+            title = article.get("title", "")
+            seen_date = article.get("seendate", "")
             evidence.append(
                 Evidence(
                     source="GDELT",
                     url=article.get("url", ""),
-                    title=article.get("title", ""),
-                    raw_text=article.get("seendate", "") + "\n\n" + article.get("socialimage", ""),
-                    text=article.get("seendate", "") + "\n\n" + article.get("socialimage", ""),
+                    title=title,
+                    raw_text=f"{title}\n\n{seen_date}".strip(),
+                    text=f"{title}\n\n{seen_date}".strip(),
                     cleaned="",
                 )
             )
 
         return evidence
-    except Exception as e:
-        logger.warning("GDELT search failed: %s", e)
-        return []
+
+    return []
 
 
 def _search_wikipedia(query: str) -> list[Evidence]:

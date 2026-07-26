@@ -1,25 +1,28 @@
-import os
 
-os.environ.setdefault("USE_TF", "0")
-os.environ.setdefault("USE_TORCH", "1")
-
-from transformers import pipeline
+import json
+from django.conf import settings
+from google import genai
+from pydantic import BaseModel, Field
+from .g import get_genai_client
 from .schemas import (
     ClaimNormalization,
     Evidence,
     NLIResult
 )
 
-nli_pipeline = pipeline(
-    "text-classification",
-    model="MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli",
-)
 
-LABEL_MAP = {
-    "ENTAILMENT": "SUPPORTS",
-    "CONTRADICTION": "REFUTES",
-    "NEUTRAL": "NEI",
-}
+class NLIResponse(BaseModel):
+    label: str = Field(description="Must be one of SUPPORTS, REFUTES, NEI")
+    confidence: float = Field(description="A confidence score between 0.0 and 1.0")
+
+
+def _truncate_evidence(text: str) -> str:
+    """Keep NLI requests within the configured input budget."""
+    limit = settings.NLI_MAX_INPUT_CHARS
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rsplit(" ", 1)[0] + "..."
+
 
 def run_nli(
     claim: ClaimNormalization,
@@ -27,12 +30,13 @@ def run_nli(
 ) -> NLIResult:
     """
     Run Natural Language Inference between a claim
-    and one evidence passage.
+    and one evidence passage using Gemini API.
     """
 
     evidence_text = (
         evidence.cleaned or evidence.text or evidence.raw_text or evidence.title or ""
     ).strip()
+    evidence_text = _truncate_evidence(evidence_text)
     claim_text = (
         claim.normalized or claim.cleaned or claim.original or ""
     ).strip()
@@ -44,26 +48,43 @@ def run_nli(
             confidence=0.0,
         )
 
-    raw = nli_pipeline(
-        {
-            "text": evidence_text,
-            "text_pair": claim_text,
-        },
-        truncation=True,
-        max_length=512,
-    )
+    client = get_genai_client()
+    
+    prompt = f"""
+Determine whether the following evidence supports, refutes, or has not enough information (NEI) regarding the claim.
 
-    if isinstance(raw, list) and len(raw) > 0:
-        result = raw[0]
-    elif isinstance(raw, dict):
-        result = raw
-    else:
-        result = {"label": "NEUTRAL", "score": 0.0}
+Claim: {claim_text}
+Evidence: {evidence_text}
 
-    label = str(result.get("label", "NEUTRAL")).upper()
-
-    return NLIResult(
-        evidence=evidence,
-        label=LABEL_MAP.get(label, label),
-        confidence=float(result.get("score", 0.0)),
-    )
+Output a strict JSON object with 'label' (one of SUPPORTS, REFUTES, NEI) and 'confidence' (float between 0.0 and 1.0).
+"""
+    try:
+        response = client.models.generate_content(
+            model=getattr(settings, "LLM_MODEL", "gemini-1.5-flash"),
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=NLIResponse,
+                temperature=0.0,
+                max_output_tokens=settings.NLI_MAX_OUTPUT_TOKENS,
+            ),
+        )
+        
+        data = json.loads(response.text)
+        label = str(data.get("label", "NEI")).upper()
+        if label not in ("SUPPORTS", "REFUTES", "NEI"):
+            label = "NEI"
+            
+        confidence = float(data.get("confidence", 0.0))
+        
+        return NLIResult(
+            evidence=evidence,
+            label=label,
+            confidence=confidence,
+        )
+    except Exception:
+        return NLIResult(
+            evidence=evidence,
+            label="NEI",
+            confidence=0.0,
+        )
