@@ -1,0 +1,145 @@
+import { Link } from "react-router-dom";
+
+const ResultCard = ({ result }) => {
+  if (!result) {
+    return (
+      <div className="border border-neutral-400 bg-white p-8 text-center space-y-4 font-serif">
+        <h3 className="text-lg font-bold text-neutral-800 uppercase tracking-wide">
+          No Verdict Report Selected
+        </h3>
+        <p className="text-xs text-neutral-600">
+          Submit a claim on the dashboard to view an AI verification report.
+        </p>
+        <Link
+          to="/dashboard"
+          className="inline-block px-5 py-2 bg-neutral-900 text-white font-bold text-xs uppercase tracking-wider hover:bg-neutral-800"
+        >
+          Go to Dashboard →
+        </Link>
+      </div>
+    );
+  }
+
+  const getVerdictStyle = (verdict) => {
+    const v = (verdict || "").toUpperCase();
+    if (v === "SUPPORTS" || v === "VERIFIED") {
+      return {
+        label: "VERIFIED",
+        colorClass: "bg-emerald-100 text-emerald-900 border-emerald-500",
+        badge: "✓",
+      };
+    }
+    if (v === "REFUTES" || v === "MISLEADING") {
+      return {
+        label: "MISLEADING",
+        colorClass: "bg-red-100 text-red-900 border-red-500",
+        badge: "✕",
+      };
+    }
+    return {
+      label: "UNVERIFIED",
+      colorClass: "bg-amber-100 text-amber-900 border-amber-500",
+      badge: "?",
+    };
+  };
+
+  const verdictInfo = getVerdictStyle(result.verdict);
+  const credibilityPercent = Math.round((result.credibility_score || 0) * 100);
+  const confidencePercent = Math.round((result.confidence_score || 0) * 100);
+
+  return (
+    <div className="border-2 border-neutral-800 bg-white p-8 space-y-6 shadow-lg font-serif">
+      {/* Top Header */}
+      <div className="flex flex-wrap items-center justify-between border-b-2 border-neutral-800 pb-4 gap-4">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 block">
+            VERDICT REPORT
+          </span>
+          <h2 className="text-2xl font-extrabold text-neutral-900 uppercase tracking-tight">
+            AI Verification Bureau Analysis
+          </h2>
+        </div>
+
+        {/* Verdict Badge */}
+        <div
+          className={`px-4 py-2 border-2 font-bold text-sm uppercase tracking-widest flex items-center gap-2 ${verdictInfo.colorClass}`}
+        >
+          <span className="font-mono text-base">{verdictInfo.badge}</span>
+          <span>{verdictInfo.label}</span>
+        </div>
+      </div>
+
+      {/* Claim Text Section */}
+      <div className="bg-[#F7F4ED] border border-neutral-400 p-4 space-y-1">
+        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-500 block">
+          SUBMITTED CLAIM
+        </span>
+        <blockquote className="text-sm font-semibold italic text-neutral-900 leading-relaxed">
+          "{result.claim_text}"
+        </blockquote>
+      </div>
+
+      {/* Scores Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Credibility Score Meter */}
+        <div className="border border-neutral-400 p-4 space-y-2 bg-[#FAF8F5]">
+          <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
+            <span className="text-neutral-700">Credibility Score</span>
+            <span className="font-mono text-base text-neutral-900">{credibilityPercent}%</span>
+          </div>
+          <div className="w-full bg-neutral-200 h-3 border border-neutral-400 overflow-hidden">
+            <div
+              className={`h-full transition-all duration-500 ${
+                credibilityPercent >= 70
+                  ? "bg-emerald-600"
+                  : credibilityPercent >= 40
+                  ? "bg-amber-500"
+                  : "bg-red-600"
+              }`}
+              style={{ width: `${credibilityPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Confidence Score Meter */}
+        <div className="border border-neutral-400 p-4 space-y-2 bg-[#FAF8F5]">
+          <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
+            <span className="text-neutral-700">AI Confidence</span>
+            <span className="font-mono text-base text-neutral-900">{confidencePercent}%</span>
+          </div>
+          <div className="w-full bg-neutral-200 h-3 border border-neutral-400 overflow-hidden">
+            <div
+              className="h-full bg-neutral-800 transition-all duration-500"
+              style={{ width: `${confidencePercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* AI Explanation / Analysis */}
+      <div className="space-y-2 border-t border-neutral-300 pt-4">
+        <h4 className="text-xs uppercase tracking-widest font-extrabold text-neutral-900">
+          EDITORIAL EXPLANATION &amp; ANALYSIS
+        </h4>
+        <p className="text-xs leading-relaxed text-neutral-800 font-serif whitespace-pre-line bg-[#FAF8F5] p-4 border border-neutral-300">
+          {result.explanation || "No detailed explanation provided for this claim."}
+        </p>
+      </div>
+
+      {/* Action Footer */}
+      <div className="border-t border-neutral-300 pt-4 flex justify-between items-center">
+        <Link
+          to="/dashboard"
+          className="px-5 py-2 bg-neutral-900 text-white font-bold text-xs uppercase tracking-wider hover:bg-neutral-800 transition-colors"
+        >
+          ← Verify Another Claim
+        </Link>
+        <span className="text-[10px] uppercase text-neutral-500 font-mono">
+          Report Generated by TruChat AI Bureau
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export default ResultCard;
