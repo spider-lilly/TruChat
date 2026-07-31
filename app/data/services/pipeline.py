@@ -6,8 +6,8 @@ from django.db import transaction
 
 from .cache import check_cache, store_cache
 from .clean import clean_text
-from .embedding import embed_claim, embed_evidence
-from .nli import run_nli
+from .embedding import embed_claim, embed_evidence, embed_evidence_batch
+from .nli import run_nli,run_nli_batch
 from .normalize import normalize_claim, normalize_evidence
 from .schemas import ScoreResult
 from .scoring import aggregate_verdict, score_claim
@@ -171,20 +171,51 @@ def process_claim(
 
     """Embed Evidence"""
     embedded_evidence = []
-    for ev in normalized_evidence:
+
+    if normalized_evidence:
+    
         try:
-            embedding = embed_evidence(ev)
-            embedded_evidence.append(
+            embeddings = embed_evidence_batch(normalized_evidence)
+
+            if len(embeddings) != len(normalized_evidence):
+                raise ValueError(
+                    f"Expected {len(normalized_evidence)} embeddings, "
+                    f"received {len(embeddings)}."
+                )
+
+            embedded_evidence = [
                 {
                     "evidence": ev,
-                    "embedding": embedding,
+                    "embedding": emb,
                 }
-            )
-        except Exception as e:
-            logger.exception("Embedding failed for %s: %s", ev.url, e)
-            continue
+                for ev, emb in zip(normalized_evidence, embeddings)
+            ]
 
+        except Exception as batch_error:
+            logger.exception(
+                "Batch embedding failed. Falling back to single embeddings. Error: %s",
+                batch_error,
+            )
+
+            for ev in normalized_evidence:
+                try:
+                    embedding = embed_evidence(ev)
+
+                    embedded_evidence.append(
+                        {
+                            "evidence": ev,
+                            "embedding": embedding,
+                        }
+                    )
+
+                except Exception as single_error:
+                    logger.exception(
+                        "Embedding failed for %s: %s",
+                        ev.url,
+                        single_error,
+                    )
     """Run NLI"""
+
     if not embedded_evidence:
         _pipeline_error(
             claim,
@@ -192,22 +223,80 @@ def process_claim(
             RuntimeError("No usable evidence found."),
         )
 
+    BATCH_SIZE = 3
+
     nli_results = []
-    for item in embedded_evidence:
+
+    for start in range(
+        0,
+        len(embedded_evidence),
+        BATCH_SIZE,
+    ):
+
+        batch = embedded_evidence[
+            start:start + BATCH_SIZE
+        ]
+
         try:
-            result = run_nli(normalized, item["evidence"])
-            item["nli"] = result
-            nli_results.append(result)
-        except Exception as e:
-            logger.exception("NLI failed for %s: %s", item["evidence"].url, e)
-            continue
+
+            results = run_nli_batch(
+                normalized,
+                [
+                    item["evidence"]
+                    for item in batch
+                ],
+            )
+
+            if len(results) != len(batch):
+                raise RuntimeError(
+                    f"Expected {len(batch)} NLI results "
+                    f"but received {len(results)}."
+                )
+
+            for item, result in zip(batch, results):
+
+                item["nli"] = result
+
+                nli_results.append(result)
+
+        except Exception as batch_error:
+
+            logger.exception(
+                "Batch NLI failed. "
+                "Falling back to individual NLI. Error: %s",
+                batch_error,
+            )
+
+            for item in batch:
+
+                try:
+
+                    result = run_nli(
+                        normalized,
+                        item["evidence"],
+                    )
+
+                    item["nli"] = result
+
+                    nli_results.append(result)
+
+                except Exception as single_error:
+
+                    logger.exception(
+                        "NLI failed for %s: %s",
+                        item["evidence"].url,
+                        single_error,
+                    )
+
+                    continue
 
     if not nli_results:
         _pipeline_error(
             claim,
             "run_nli",
-            RuntimeError("No NLI results generated"),
+            RuntimeError("No NLI results generated."),
         )
+
 
     """Aggregate Verdict"""
     try:

@@ -39,3 +39,46 @@ def embed_evidence(evidence: Evidence) -> np.ndarray:
     )
     return np.asarray(response.embeddings[0].values, dtype=np.float32)
 
+def embed_evidence_batch(evidences: list[Evidence]) -> list[np.ndarray]:
+    """
+    Return normalized float32 embeddings for multiple evidence objects.
+    Falls back to zero vectors if an item has no text.
+    """
+    client = _get_client()
+
+    texts = []
+    valid_indices = []
+
+    embeddings = [
+        np.zeros(768, dtype=np.float32)
+        for _ in evidences
+    ]
+
+    for i, evidence in enumerate(evidences):
+        text = (
+            evidence.cleaned
+            or evidence.text
+            or evidence.raw_text
+            or evidence.title
+            or ""
+        )
+
+        if text:
+            texts.append(text)
+            valid_indices.append(i)
+
+    if not texts:
+        return embeddings
+
+    response = client.models.embed_content(
+        model=settings.EMBEDDING_MODEL,
+        contents=texts,
+    )
+
+    for idx, embedding in zip(valid_indices, response.embeddings):
+        embeddings[idx] = np.asarray(
+            embedding.values,
+            dtype=np.float32,
+        )
+
+    return embeddings

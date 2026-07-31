@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pydantic import BaseModel,Field
 
 @dataclass(slots=True)
 class Entities:
@@ -52,3 +53,12 @@ class ScoreResult:
     confidence_score: float
     credibility_score: float
     explanation: str
+
+class BatchNLIItem(BaseModel):
+    id: int = Field(description="Index of the evidence in the batch.")
+    label: str = Field(description="SUPPORTS, REFUTES or NEI")
+    confidence: float = Field(description="Confidence between 0.0 and 1.0")
+
+
+class BatchNLIResponse(BaseModel):
+    results: list[BatchNLIItem]
