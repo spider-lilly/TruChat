@@ -1,4 +1,3 @@
-import logging
 import json
 from django.conf import settings
 from google import genai
@@ -10,7 +9,6 @@ from .schemas import (
     NLIResult
 )
 
-logger = logging.getLogger(__name__)
 class NLIResponse(BaseModel):
     label: str = Field(description="Must be one of SUPPORTS, REFUTES, NEI")
     confidence: float = Field(description="A confidence score between 0.0 and 1.0")
