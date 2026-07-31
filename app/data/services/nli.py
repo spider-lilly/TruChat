@@ -186,7 +186,6 @@ Evidence:
     )
 
     try:
-        logger.error("Batch NLI raw response:\n%s", response.text)
         data = json.loads(response.text)
     except Exception as e:
         raise RuntimeError("Gemini returned invalid JSON.") from e
