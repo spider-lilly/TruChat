@@ -50,7 +50,6 @@ class NLIResult:
 @dataclass(slots=True)
 class ScoreResult:
     verdict: str
-    confidence_score: float
     credibility_score: float
     explanation: str
 

@@ -22,14 +22,17 @@ const MainContent = ({ onClaimSubmitted }) => {
     setClaimText(example);
   };
 
-  const handleSubmitClaim = async (text) => {
+  const handleSubmitClaim = async (text, attachments = []) => {
     setIsSubmitting(true);
     setErrorMessage("");
 
     try {
-      const response = await checkClaim(text);
+      const imageAttachment = attachments.find((att) => att.type === "image" && att.file);
+      const imageFile = imageAttachment ? imageAttachment.file : null;
+
+      const response = await checkClaim(text, imageFile);
       const resultData = {
-        claim_text: text,
+        claim_text: text || "Uploaded Image Claim",
         verdict: response.data.verdict,
         credibility_score: response.data.credibility_score,
         confidence_score: response.data.confidence_score,

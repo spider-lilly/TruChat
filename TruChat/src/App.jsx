@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 
 // Main Pages
 import Dashboard from "./pages/Dashboard";
+import History from "./pages/History";
 import Result from "./pages/Result";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -45,6 +46,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <History />
               </ProtectedRoute>
             }
           />

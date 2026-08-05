@@ -17,7 +17,6 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 class ScoreResponse(BaseModel):
-    confidence_score: float = Field(description="Value between 0 and 1.")
     credibility_score: float = Field(description="Value between 0 and 1.")
     explanation: str = Field(description="Explanation in under 150 words.")
 
@@ -103,15 +102,12 @@ The verdict has already been computed.
 
 Evaluate only:
 
-1. confidence_score
-   How confident are you in the provided verdict?
+1. credibility_score
+   A combined assessment of how well the evidence supports the verdict and
+   how credible the sources and evidence are.
    Value between 0 and 1.
 
-2. credibility_score
-   How credible are the provided sources and evidence?
-   Value between 0 and 1.
-
-3. explanation
+2. explanation
    Explain your reasoning in under 150 words.
 """
     )
@@ -124,7 +120,7 @@ def score_claim(
     nli_results: list[NLIResult],
 ) -> ScoreResult:
     """
-    Generate confidence and credibility scores using the LLM with robust fallback.
+    Generate one combined credibility score using the LLM with robust fallback.
     """
     verdict = aggregate_verdict(nli_results)
 
@@ -133,7 +129,8 @@ def score_claim(
         winning_scores = [n.confidence for n in nli_results if n.label == verdict]
         avg_confidence = sum(winning_scores) / len(winning_scores) if winning_scores else 0.5
         source_count = len(set(e.source for e in evidence))
-        credibility = min(1.0, 0.4 + (source_count * 0.15) + (avg_confidence * 0.3))
+        source_credibility = min(1.0, 0.4 + (source_count * 0.15) + (avg_confidence * 0.3))
+        credibility = (avg_confidence + source_credibility) / 2
     else:
         avg_confidence = 0.5
         credibility = 0.5
@@ -148,7 +145,6 @@ def score_claim(
         logger.warning("GEMINI_API_KEY not configured. Using rule-based fallback scoring.")
         return ScoreResult(
             verdict=verdict,
-            confidence_score=round(float(avg_confidence), 2),
             credibility_score=round(float(credibility), 2),
             explanation=fallback_explanation,
         )
@@ -175,7 +171,6 @@ def score_claim(
         result = json.loads(response.text)
         return ScoreResult(
             verdict=verdict,
-            confidence_score=float(result.get("confidence_score", avg_confidence)),
             credibility_score=float(result.get("credibility_score", credibility)),
             explanation=str(result.get("explanation", fallback_explanation)),
         )
@@ -183,7 +178,6 @@ def score_claim(
         logger.warning("LLM scoring call failed: %s. Using rule-based fallback scoring.", e)
         return ScoreResult(
             verdict=verdict,
-            confidence_score=round(float(avg_confidence), 2),
             credibility_score=round(float(credibility), 2),
             explanation=fallback_explanation,
         )

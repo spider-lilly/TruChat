@@ -37,7 +37,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F4ED] text-neutral-900 selection:bg-red-200 selection:text-red-900">
-      <div className="max-w-[1400px] mx-auto min-h-screen flex flex-col border-x border-neutral-400 bg-[#FAF8F5] shadow-xl">
+      <div className="max-w-350 mx-auto min-h-screen flex flex-col border-x border-neutral-400 bg-[#FAF8F5] shadow-xl">
         {/* Navigation & Header */}
         <Navbar />
 

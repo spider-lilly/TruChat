@@ -2,7 +2,9 @@
 
 import uuid
 
+from django.conf import settings
 from django.db import models
+from pgvector.django import HnswIndex, VectorField
 
 class ClaimStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
@@ -18,8 +20,23 @@ class Verdict(models.TextChoices):
 
 class Claim(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="claims",
+        null=True,
+        blank=True,
+    )
     claim_text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    input_source = models.CharField(
+        max_length=20,
+        choices=(
+            ("TEXT", "Text"),
+            ("OCR", "OCR"),
+        ),
+        default="TEXT",
+    )
     cleaned_claim = models.TextField(blank=True)
     normalized_claim = models.TextField(blank=True)
     canonical_claim = models.TextField(blank=True)
@@ -53,7 +70,18 @@ class ClaimEmbedding(models.Model):
         related_name="embedding",
     )
 
-    embedding_vector = models.JSONField()
+    embedding_vector = VectorField(dimensions=1024)
+
+    class Meta:
+        indexes = [
+            HnswIndex(
+                name="claim_embedding_hnsw",
+                fields=["embedding_vector"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_cosine_ops"],
+            ),
+        ]
 
 class Source(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -78,7 +106,7 @@ class SourceEmbedding(models.Model):
         primary_key=True,
         related_name="embedding",
     )
-    embedding_vector = models.JSONField()
+    embedding_vector = VectorField(dimensions=1024)
 
 
 class NLIResult(models.Model):
@@ -107,6 +135,17 @@ class FinalResult(models.Model):
         max_length=20,
         choices=Verdict.choices,
     )
+    confidence_score = models.FloatField(default=0.0)
     credibility_score = models.FloatField()
-    confidence_score = models.FloatField()
     llm_explanation = models.TextField()
+
+
+class ExactClaimCache(models.Model):
+    """Direct cache for a normalized claim and its completed evaluation."""
+
+    normalized_claim = models.TextField(unique=True)
+    verdict = models.CharField(max_length=20, choices=Verdict.choices)
+    confidence_score = models.FloatField(default=0.0)
+    credibility_score = models.FloatField()
+    explanation = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)

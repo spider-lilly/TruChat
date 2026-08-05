@@ -13,8 +13,10 @@ const ClaimInput = ({ onSubmitClaim, isSubmitting }) => {
     }
   };
 
+  const hasContent = claimText.trim().length > 0 || attachments.length > 0;
+
   const handleSubmit = () => {
-    if (!claimText.trim() || isSubmitting) return;
+    if (!hasContent || isSubmitting) return;
     onSubmitClaim(claimText.trim(), attachments);
   };
 
@@ -89,9 +91,9 @@ const ClaimInput = ({ onSubmitClaim, isSubmitting }) => {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!claimText.trim() || isSubmitting}
+          disabled={!hasContent || isSubmitting}
           className={`px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-            !claimText.trim() || isSubmitting
+            !hasContent || isSubmitting
               ? "bg-neutral-300 text-neutral-500 cursor-not-allowed"
               : "bg-neutral-900 text-white hover:bg-neutral-800 active:scale-98"
           }`}

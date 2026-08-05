@@ -60,10 +60,11 @@ WIKIDATA_RESULTS = 5
 WIKIPEDIA_RESULTS = 3
 SEARCH_WORKERS = 4
 SEARCH_TIMEOUT = 15
+TOP_EVIDENCE_FOR_NLI = 12
 TAVILY_SEARCH_DEPTH = "advanced"
 # Keep per-claim LLM usage bounded.  These can be raised through environment
 # variables when a deployment needs more evidence or longer passages.
-MAX_EVIDENCE_PER_CLAIM = int(os.getenv("MAX_EVIDENCE_PER_CLAIM", "8"))
+MAX_EVIDENCE_PER_CLAIM = int(os.getenv("MAX_EVIDENCE_PER_CLAIM", "20"))
 NLI_MAX_INPUT_CHARS = int(os.getenv("NLI_MAX_INPUT_CHARS", "2400"))
 EMBEDDING_MAX_INPUT_CHARS = int(os.getenv("EMBEDDING_MAX_INPUT_CHARS", "2400"))
 NLI_MAX_OUTPUT_TOKENS = int(os.getenv("NLI_MAX_OUTPUT_TOKENS", "64"))
@@ -75,15 +76,10 @@ GDELT_BASE_URL = os.getenv(
     "GDELT_BASE_URL",
     "https://api.gdeltproject.org/api/v2/doc/doc"
 )
+OCRAPI = os.getenv("OCRAPI")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 API_KEY = os.getenv("LLM_KEY") or os.getenv("API_KEY") or os.getenv("XAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-REDIS_URL = os.getenv("REDIS_URL")
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
-
 # Embedding
 EMBEDDING_MODEL = os.getenv(
     "EMBEDDING_MODEL",
@@ -117,6 +113,7 @@ ALLOWED_HOSTS = [
 
 INSTALLED_APPS = [
     'django.contrib.admin',
+    "pgvector.django",
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -128,6 +125,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "user",
     "data",
+    "history",
 ]
 
 MIDDLEWARE = [
@@ -169,6 +167,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 db_url = os.getenv("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+print(db_url)
 DATABASES = {
     "default": dj_database_url.config(
         default=db_url,

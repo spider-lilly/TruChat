@@ -3,16 +3,16 @@ import logging
 
 from django.conf import settings
 from django.db import transaction
-
-from .cache import check_cache, store_cache
-from .clean import clean_text
-from .embedding import embed_claim, embed_evidence, embed_evidence_batch
-from .nli import run_nli,run_nli_batch
-from .normalize import normalize_claim, normalize_evidence
-from .schemas import ScoreResult
-from .scoring import aggregate_verdict, score_claim
-from .search import search_claim
-from ..models import (
+from services.imgtotext import load_image, ocr_space_extract, clean_ocr_text
+from services.clean import clean_text
+from services.embedding import embed_claim, embed_evidence, embed_evidence_batch , rerank_evidence
+from services.nli import run_nli,run_nli_batch
+from services.normalize import normalize_claim, normalize_evidence
+from services.schemas import ScoreResult
+from services.scoring import aggregate_verdict, score_claim
+from services.search import search_claim
+from services.vectordb import get_exact_result, get_similar_result, store_exact_result
+from .models import (
     Claim,
     ClaimEmbedding,
     ClaimStatus,
@@ -74,8 +74,39 @@ def _pipeline_error(claim, stage, error):
     ) from error
 
 
+def process_image(
+    image_input,
+    user=None,
+):
+
+    # Load image
+    image_bytes, mime_type = load_image(image_input)
+
+    # OCR
+    raw_text = ocr_space_extract(
+        image_bytes=image_bytes,
+        mime_type=mime_type,
+    )
+
+    # Local cleanup
+    extracted_text = clean_ocr_text(raw_text)
+
+    if not extracted_text.strip():
+        raise ValueError(
+            "No readable text was found in the uploaded image."
+        )
+
+    # Reuse the existing text pipeline
+    return process_claim(
+        claim_text=extracted_text,
+        user=user,
+        input_source="IMAGE",
+    )
+
 def process_claim(
     claim_text: str,
+    user=None,
+    input_source: str = "TEXT",
 ) -> ScoreResult:
     """Create Claim"""
 
@@ -83,8 +114,10 @@ def process_claim(
 
     try:
         claim = Claim.objects.create(
+            user=user,
             claim_text=claim_text,
             status=ClaimStatus.PROCESSING,
+            input_source=input_source,
         )
     except Exception:
         logger.exception("Failed to create claim")
@@ -119,36 +152,75 @@ def process_claim(
     claim.numbers = normalized.numbers
     claim.dates = normalized.dates
 
-    """Embed Claim"""
+    """Exact PostgreSQL cache lookup"""
     try:
-        claim_embedding = embed_claim(normalized)
+        cached_result = get_exact_result(normalized)
     except Exception as e:
-        _pipeline_error(
-            claim,
-            "embed_claim",
-            e,
-        )
-
-    """Redis Lookup"""
-    try:
-        cached_result = check_cache(
-            normalized,
-            claim_embedding,
-        )
-    except Exception as e:
-        logger.warning("Redis cache check failed, proceeding with full pipeline: %s", e)
+        logger.warning("Exact cache lookup failed, proceeding with full pipeline: %s", e)
         cached_result = None
 
     if cached_result is not None:
         try:
+            claim.cleaned_claim = normalized.cleaned
+            claim.normalized_claim = normalized.normalized
+            claim.canonical_claim = normalized.canonical
+            claim.fingerprint = normalized.fingerprint
+            claim.entities = asdict(normalized.entities)
+            claim.keywords = normalized.keywords
+            claim.numbers = normalized.numbers
+            claim.dates = normalized.dates
             claim.status = ClaimStatus.COMPLETED
-            claim.save(update_fields=["status"])
+            claim.save()
+            FinalResult.objects.create(
+                claim=claim,
+                verdict=cached_result.verdict,
+                credibility_score=cached_result.credibility_score,
+                llm_explanation=cached_result.explanation,
+            )
         except Exception as e:
             _pipeline_error(
                 claim,
                 "update_cached_claim_status",
                 e,
             )
+
+        return cached_result
+
+    """Embed Claim"""
+    try:
+        claim_embedding = embed_claim(normalized)
+    except Exception as e:
+        _pipeline_error(claim, "embed_claim", e)
+
+    """pgvector semantic lookup"""
+    try:
+        cached_result = get_similar_result(claim_embedding)
+    except Exception as e:
+        logger.warning("pgvector cache lookup failed, proceeding with full pipeline: %s", e)
+        cached_result = None
+
+    if cached_result is not None:
+        try:
+            claim.cleaned_claim = normalized.cleaned
+            claim.normalized_claim = normalized.normalized
+            claim.canonical_claim = normalized.canonical
+            claim.fingerprint = normalized.fingerprint
+            claim.entities = asdict(normalized.entities)
+            claim.keywords = normalized.keywords
+            claim.numbers = normalized.numbers
+            claim.dates = normalized.dates
+            claim.status = ClaimStatus.COMPLETED
+            claim.save()
+            ClaimEmbedding.objects.create(claim=claim, embedding_vector=claim_embedding.tolist())
+            FinalResult.objects.create(
+                claim=claim,
+                verdict=cached_result.verdict,
+                credibility_score=cached_result.credibility_score,
+                llm_explanation=cached_result.explanation,
+            )
+            store_exact_result(normalized, cached_result)
+        except Exception as e:
+            _pipeline_error(claim, "save_semantic_cache_hit", e)
 
         return cached_result
 
@@ -214,6 +286,17 @@ def process_claim(
                         ev.url,
                         single_error,
                     )
+
+    """Rerank Evidence"""
+    try:
+        embedded_evidence = rerank_evidence(
+            claim_embedding,
+            [item["evidence"] for item in embedded_evidence],
+            [item["embedding"] for item in embedded_evidence],
+            top_k=settings.TOP_EVIDENCE_FOR_NLI,
+        )
+    except Exception as e:
+        _pipeline_error(claim, "rerank_evidence", e)
     """Run NLI"""
 
     if not embedded_evidence:
@@ -405,7 +488,6 @@ def process_claim(
                 FinalResult.objects.create(
                     claim=claim,
                     verdict=verdict,
-                    confidence_score=score.confidence_score,
                     credibility_score=score.credibility_score,
                     llm_explanation=score.explanation,
                 )
@@ -424,14 +506,8 @@ def process_claim(
         _pipeline_error(claim, write_stage, e)
 
     try:
-        store_cache(
-            claim,
-            normalized,
-            claim_embedding,
-            verdict,
-            score,
-        )
+        store_exact_result(normalized, score)
     except Exception:
-        logger.exception("Failed to store result in Redis cache.")
+        logger.exception("Failed to store exact PostgreSQL cache result.")
 
     return score

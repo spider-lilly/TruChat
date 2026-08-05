@@ -27,9 +27,9 @@ const Sidebar = ({ verdictCounts = { verified: 0, unverified: 0, misleading: 0 }
             <span className="text-red-600 font-bold">•</span> VERIFY NEWS
           </Link>
           <Link
-            to="/result"
+            to="/history"
             className={`block py-1 transition-colors ${
-              location.pathname === "/result"
+              location.pathname === "/history"
                 ? "text-neutral-900 font-extrabold"
                 : "text-neutral-500 hover:text-neutral-900"
             }`}

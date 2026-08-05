@@ -3,7 +3,7 @@ import numpy as np
 from django.conf import settings
 from google import genai
 from .schemas import ClaimNormalization, Evidence
-
+from typing import List
 
 
 def _get_client() -> genai.Client:
@@ -16,7 +16,7 @@ def embed_claim(claim: ClaimNormalization) -> np.ndarray:
     client = _get_client()
     text = claim.normalized or claim.cleaned or claim.original or ""
     if not text:
-        return np.zeros(768, dtype=np.float32)
+        return np.zeros(settings.EMBEDDING_DIMENSION, dtype=np.float32)
 
     response = client.models.embed_content(
         model=settings.EMBEDDING_MODEL,
@@ -31,7 +31,7 @@ def embed_evidence(evidence: Evidence) -> np.ndarray:
     client = _get_client()
     text = evidence.cleaned or evidence.text or evidence.raw_text or evidence.title or ""
     if not text:
-        return np.zeros(768, dtype=np.float32)
+        return np.zeros(settings.EMBEDDING_DIMENSION, dtype=np.float32)
 
     response = client.models.embed_content(
         model=settings.EMBEDDING_MODEL,
@@ -50,7 +50,7 @@ def embed_evidence_batch(evidences: list[Evidence]) -> list[np.ndarray]:
     valid_indices = []
 
     embeddings = [
-        np.zeros(768, dtype=np.float32)
+        np.zeros(settings.EMBEDDING_DIMENSION, dtype=np.float32)
         for _ in evidences
     ]
 
@@ -82,3 +82,49 @@ def embed_evidence_batch(evidences: list[Evidence]) -> list[np.ndarray]:
         )
 
     return embeddings
+
+
+def rerank_evidence(
+    claim_embedding: np.ndarray,
+    evidences: list[Evidence],
+    evidence_embeddings: list[np.ndarray],
+    top_k: int = settings.TOP_EVIDENCE_FOR_NLI,
+) -> list[dict]:
+ 
+    
+    ranked = []
+
+    claim_norm = np.linalg.norm(claim_embedding)
+
+    if claim_norm == 0:
+        return []
+
+    for evidence, embedding in zip(
+        evidences,
+        evidence_embeddings,
+    ):
+
+        emb_norm = np.linalg.norm(embedding)
+
+        if emb_norm == 0:
+            continue
+
+        similarity = np.dot(
+            claim_embedding,
+            embedding,
+        ) / (claim_norm * emb_norm)
+
+        ranked.append(
+            {
+                "similarity": similarity,
+                "evidence": evidence,
+                "embedding": embedding,
+            }
+        )
+
+    ranked.sort(
+        key=lambda x: x["similarity"],
+        reverse=True,
+    )
+
+    return ranked[:top_k]
