@@ -101,19 +101,6 @@ const ResultCard = ({ result }) => {
           </div>
         </div>
 
-        {/* Confidence Score Meter */}
-        <div className="border border-neutral-400 p-4 space-y-2 bg-[#FAF8F5]">
-          <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
-            <span className="text-neutral-700">AI Confidence</span>
-            <span className="font-mono text-base text-neutral-900">{confidencePercent}%</span>
-          </div>
-          <div className="w-full bg-neutral-200 h-3 border border-neutral-400 overflow-hidden">
-            <div
-              className="h-full bg-neutral-800 transition-all duration-500"
-              style={{ width: `${confidencePercent}%` }}
-            />
-          </div>
-        </div>
       </div>
 
       {/* AI Explanation / Analysis */}

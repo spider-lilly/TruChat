@@ -215,7 +215,7 @@ def format_output(text: str, output_format: str = "markdown") -> str:
         )
 
 
-def process_image(image_input: Any, output_format: str = "markdown") -> dict:
+def process_image_to_text(image_input: Any, output_format: str = "markdown") -> dict:
     """Execute the full OCR pipeline for an input image.
 
     Pipeline: load_image -> ocr_space_extract -> clean_ocr_text -> format_output

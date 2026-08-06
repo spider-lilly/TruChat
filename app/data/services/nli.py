@@ -58,7 +58,7 @@ Output a strict JSON object with 'label' (one of SUPPORTS, REFUTES, NEI) and 'co
 """
     try:
         response = client.models.generate_content(
-            model=getattr(settings, "LLM_MODEL", "gemini-1.5-flash"),
+            model=getattr(settings, "LLM_MODEL"),
             contents=prompt,
             config=genai.types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -172,7 +172,6 @@ Evidence:
 """
 
     client = get_genai_client()
-
     response = client.models.generate_content(
         model=getattr(settings, "LLM_MODEL", "gemini-1.5-flash"),
         contents=prompt,
@@ -182,7 +181,7 @@ Evidence:
             max_output_tokens=settings.NLI_MAX_OUTPUT_TOKENS,
         ),
     )
-
+  
     try:
         data = json.loads(response.text)
     except Exception as e:

@@ -8,7 +8,8 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
-
+from .pipeline import process_claim , process_image
+from .services.imgtotext import process_image_to_text
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 
@@ -47,9 +48,8 @@ class ImageOCRView(APIView):
         output_format = request.data.get("output_format", "markdown")
 
         try:
-            from services.imgtotext import process_image
 
-            result = process_image(image_input, output_format=output_format)
+            result = process_image_to_text(image_input, output_format=output_format)
             return Response(result, status=status.HTTP_200_OK)
         except ValueError as e:
             logger.warning("Invalid OCR input: %s", e)
@@ -84,48 +84,35 @@ class ClaimCheckView(APIView):
             or request.data.get("image_input")
         )
 
-        if image_input:
-            from services.imgtotext import process_image
-
-            try:
-                ocr_result = process_image(image_input)
-                claim_text = ocr_result.get("formatted_text") or ocr_result.get("text", "")
-            except ValueError as e:
-                return Response(
-                    {"detail": f"Invalid image input: {str(e)}"},
-                    status=status.HTTP_400_BAD_REQUEST,
+        try:
+            if image_input:
+                result = process_image(
+                    image_input=image_input,
+                    user=request.user if request.user.is_authenticated else None,
                 )
-            except Exception as e:
-                logger.exception("OCR extraction failed during claim check.")
-                return Response(
-                    {"detail": f"Failed to extract text from image: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-        else:
-            serializer = ClaimCheckRequestSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            claim_text = serializer.validated_data.get("claim_text")
+            else:
+                serializer = ClaimCheckRequestSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
 
-        if not claim_text:
+                result = process_claim(
+                    claim_text=serializer.validated_data["claim_text"],
+                    user=request.user if request.user.is_authenticated else None,
+                    input_source="TEXT",
+                )
+
+        except ValueError as e:
             return Response(
-                {"detail": "No text or image provided for claim checking."},
+                {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            from .pipeline import process_claim
-
-            result = process_claim(
-                claim_text,
-                user=request.user if request.user.is_authenticated else None,
-                input_source="OCR" if image_input else "TEXT",
-            )
         except RuntimeError:
             logger.exception("Claim-processing pipeline failed.")
             return Response(
                 {"detail": "The claim could not be processed."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
         except Exception:
             logger.exception("Unexpected claim-processing failure.")
             return Response(

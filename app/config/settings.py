@@ -64,10 +64,10 @@ TOP_EVIDENCE_FOR_NLI = 12
 TAVILY_SEARCH_DEPTH = "advanced"
 # Keep per-claim LLM usage bounded.  These can be raised through environment
 # variables when a deployment needs more evidence or longer passages.
-MAX_EVIDENCE_PER_CLAIM = int(os.getenv("MAX_EVIDENCE_PER_CLAIM", "20"))
+MAX_EVIDENCE_PER_CLAIM = int(os.getenv("MAX_EVIDENCE_PER_CLAIM", "12"))
 NLI_MAX_INPUT_CHARS = int(os.getenv("NLI_MAX_INPUT_CHARS", "2400"))
 EMBEDDING_MAX_INPUT_CHARS = int(os.getenv("EMBEDDING_MAX_INPUT_CHARS", "2400"))
-NLI_MAX_OUTPUT_TOKENS = int(os.getenv("NLI_MAX_OUTPUT_TOKENS", "64"))
+NLI_MAX_OUTPUT_TOKENS = int(os.getenv("NLI_MAX_OUTPUT_TOKENS", "512"))
 NORMALIZATION_MAX_OUTPUT_TOKENS = int(
     os.getenv("NORMALIZATION_MAX_OUTPUT_TOKENS", "512")
 )
@@ -167,7 +167,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 db_url = os.getenv("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
-print(db_url)
+
 DATABASES = {
     "default": dj_database_url.config(
         default=db_url,

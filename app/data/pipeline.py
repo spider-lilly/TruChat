@@ -3,15 +3,16 @@ import logging
 
 from django.conf import settings
 from django.db import transaction
-from services.imgtotext import load_image, ocr_space_extract, clean_ocr_text
-from services.clean import clean_text
-from services.embedding import embed_claim, embed_evidence, embed_evidence_batch , rerank_evidence
-from services.nli import run_nli,run_nli_batch
-from services.normalize import normalize_claim, normalize_evidence
-from services.schemas import ScoreResult
-from services.scoring import aggregate_verdict, score_claim
-from services.search import search_claim
-from services.vectordb import get_exact_result, get_similar_result, store_exact_result
+from .services.imgtotext import process_image_to_text
+from .services.clean import clean_text
+from .services.embedding import embed_claim, embed_evidence, embed_evidence_batch , rerank_evidence
+from .services.nli import run_nli,run_nli_batch
+from .services.normalize import normalize_claim, normalize_evidence
+from .services.schemas import ScoreResult
+from .services.scoring import aggregate_verdict, score_claim
+from .services.search import search_claim
+from .services.claim_check import is_claim
+from .services.vectordb import get_exact_result, get_similar_result, store_exact_result
 from .models import (
     Claim,
     ClaimEmbedding,
@@ -79,26 +80,17 @@ def process_image(
     user=None,
 ):
 
-    # Load image
-    image_bytes, mime_type = load_image(image_input)
+        # Load image
+    try:
+        ocr_result = process_image_to_text(image_input)
+    except Exception as e:
+        logger.exception("Image processing failed.")
+        raise RuntimeError(
+            "Pipeline failed at stage: process_image_to_text"
+        ) from e
 
-    # OCR
-    raw_text = ocr_space_extract(
-        image_bytes=image_bytes,
-        mime_type=mime_type,
-    )
-
-    # Local cleanup
-    extracted_text = clean_ocr_text(raw_text)
-
-    if not extracted_text.strip():
-        raise ValueError(
-            "No readable text was found in the uploaded image."
-        )
-
-    # Reuse the existing text pipeline
     return process_claim(
-        claim_text=extracted_text,
+        claim_text=ocr_result["formatted_text"],
         user=user,
         input_source="IMAGE",
     )
@@ -122,7 +114,13 @@ def process_claim(
     except Exception:
         logger.exception("Failed to create claim")
         raise
+    is_valid_claim, metadata = is_claim(claim.claim_text)
 
+    if not is_valid_claim:
+        raise ValueError(
+            f"Input classified as '{metadata['type'].value}', "
+            "not suitable for fact checking."
+        )
     """Clean Stage"""
     try:
         cleaned = clean_text(claim.claim_text)
@@ -241,64 +239,68 @@ def process_claim(
             logger.exception("Failed to normalize evidence: %s", ev.url)
             continue
 
-    """Embed Evidence"""
-    embedded_evidence = []
+    """Embed Evidence(to be used when reranking evidence)"""
 
-    if normalized_evidence:
+    # embedded_evidence = []
+
+    # if normalized_evidence:
     
-        try:
-            embeddings = embed_evidence_batch(normalized_evidence)
+    #     try:
+    #         embeddings = embed_evidence_batch(normalized_evidence)
 
-            if len(embeddings) != len(normalized_evidence):
-                raise ValueError(
-                    f"Expected {len(normalized_evidence)} embeddings, "
-                    f"received {len(embeddings)}."
-                )
+    #         if len(embeddings) != len(normalized_evidence):
+    #             raise ValueError(
+    #                 f"Expected {len(normalized_evidence)} embeddings, "
+    #                 f"received {len(embeddings)}."
+    #             )
 
-            embedded_evidence = [
-                {
-                    "evidence": ev,
-                    "embedding": emb,
-                }
-                for ev, emb in zip(normalized_evidence, embeddings)
-            ]
+    #         embedded_evidence = [
+    #             {
+    #                 "evidence": ev,
+    #                 "embedding": emb,
+    #             }
+    #             for ev, emb in zip(normalized_evidence, embeddings)
+    #         ]
 
-        except Exception as batch_error:
-            logger.exception(
-                "Batch embedding failed. Falling back to single embeddings. Error: %s",
-                batch_error,
-            )
+    #     except Exception as batch_error:
+    #         logger.exception(
+    #             "Batch embedding failed. Falling back to single embeddings. Error: %s",
+    #             batch_error,
+    #         )
 
-            for ev in normalized_evidence:
-                try:
-                    embedding = embed_evidence(ev)
+    #         for ev in normalized_evidence:
+    #             try:
+    #                 embedding = embed_evidence(ev)
 
-                    embedded_evidence.append(
-                        {
-                            "evidence": ev,
-                            "embedding": embedding,
-                        }
-                    )
+    #                 embedded_evidence.append(
+    #                     {
+    #                         "evidence": ev,
+    #                         "embedding": embedding,
+    #                     }
+    #                 )
 
-                except Exception as single_error:
-                    logger.exception(
-                        "Embedding failed for %s: %s",
-                        ev.url,
-                        single_error,
-                    )
+    #             except Exception as single_error:
+    #                 logger.exception(
+    #                     "Embedding failed for %s: %s",
+    #                     ev.url,
+    #                     single_error,
+    #                 )
 
-    """Rerank Evidence"""
-    try:
-        embedded_evidence = rerank_evidence(
-            claim_embedding,
-            [item["evidence"] for item in embedded_evidence],
-            [item["embedding"] for item in embedded_evidence],
-            top_k=settings.TOP_EVIDENCE_FOR_NLI,
-        )
-    except Exception as e:
-        _pipeline_error(claim, "rerank_evidence", e)
+    """Rerank Evidence """
+    # try:
+    #     embedded_evidence = rerank_evidence(
+    #         claim_embedding,
+    #         [item["evidence"] for item in embedded_evidence],
+    #         [item["embedding"] for item in embedded_evidence],
+    #         top_k=settings.TOP_EVIDENCE_FOR_NLI,
+    #     )
+    # except Exception as e:
+    #     _pipeline_error(claim, "rerank_evidence", e)
     """Run NLI"""
-
+    embedded_evidence = [
+        {"evidence": ev}
+        for ev in normalized_evidence
+    ]
     if not embedded_evidence:
         _pipeline_error(
             claim,
@@ -445,6 +447,8 @@ def process_claim(
 
             """Save Source Embeddings"""
             for item in embedded_evidence:
+                if "embedding" not in item:
+                    continue
                 try:
                     SourceEmbedding.objects.create(
                         source=item["source"],

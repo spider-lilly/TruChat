@@ -2,6 +2,7 @@
 import numpy as np
 from django.conf import settings
 from google import genai
+from google.genai import types
 from .schemas import ClaimNormalization, Evidence
 from typing import List
 
@@ -21,6 +22,9 @@ def embed_claim(claim: ClaimNormalization) -> np.ndarray:
     response = client.models.embed_content(
         model=settings.EMBEDDING_MODEL,
         contents=text,
+        config=types.EmbedContentConfig(
+            output_dimensionality=settings.EMBEDDING_DIMENSION,
+        ),
     )
     # The response has a list of embeddings; we take the first one
     return np.asarray(response.embeddings[0].values, dtype=np.float32)
@@ -36,6 +40,9 @@ def embed_evidence(evidence: Evidence) -> np.ndarray:
     response = client.models.embed_content(
         model=settings.EMBEDDING_MODEL,
         contents=text,
+        config=types.EmbedContentConfig(
+            output_dimensionality=settings.EMBEDDING_DIMENSION,
+        ),
     )
     return np.asarray(response.embeddings[0].values, dtype=np.float32)
 
