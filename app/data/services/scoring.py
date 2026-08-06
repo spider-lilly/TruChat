@@ -17,7 +17,15 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 class ScoreResponse(BaseModel):
-    credibility_score: float = Field(description="Value between 0 and 1.")
+    credibility_score: float = Field(
+        description=(
+            "Credibility score between 0.0 and 1.0. "
+            "For SUPPORTS verdicts use 0.55–0.95. "
+            "For REFUTES verdicts use 0.05–0.45. "
+            "For NEI verdicts use 0.35–0.65. "
+            "Do NOT return 1.0 or 0.0 exactly."
+        )
+    )
     explanation: str = Field(description="Explanation in under 150 words.")
 
 
@@ -95,17 +103,23 @@ Content:
 """
         )
 
+    score_guidance = {
+        "SUPPORTS": "0.55–0.95 (claim is supported — higher means stronger evidence)",
+        "REFUTES":  "0.05–0.45 (claim is refuted — lower means stronger refutation)",
+        "NEI":      "0.35–0.65 (insufficient evidence — stay near 0.5)",
+    }.get(verdict, "0.1–0.9")
+
     prompt.append(
-        """
+        f"""
 Your task is NOT to determine whether the claim is true or false.
-The verdict has already been computed.
+The verdict has already been computed as: {verdict}
 
 Evaluate only:
 
 1. credibility_score
-   A combined assessment of how well the evidence supports the verdict and
-   how credible the sources and evidence are.
-   Value between 0 and 1.
+   How well the evidence supports the verdict and how credible the sources are.
+   Required range for {verdict}: {score_guidance}
+   NEVER return exactly 0.0 or 1.0.
 
 2. explanation
    Explain your reasoning in under 150 words.
@@ -128,9 +142,16 @@ def score_claim(
     if nli_results:
         winning_scores = [n.confidence for n in nli_results if n.label == verdict]
         avg_confidence = sum(winning_scores) / len(winning_scores) if winning_scores else 0.5
-        source_count = len(set(e.source for e in evidence))
-        source_credibility = min(1.0, 0.4 + (source_count * 0.15) + (avg_confidence * 0.3))
-        credibility = (avg_confidence + source_credibility) / 2
+        source_count = min(len(set(e.source for e in evidence)), 5)
+        # Base score from evidence quality (0–1 range)
+        raw_score = min(0.95, 0.35 + (source_count * 0.08) + (avg_confidence * 0.35))
+        # Map to verdict-appropriate range so score reflects the verdict direction
+        if verdict == "SUPPORTS":
+            credibility = 0.55 + raw_score * 0.40   # 0.55 – 0.95
+        elif verdict == "REFUTES":
+            credibility = 0.45 - raw_score * 0.40   # 0.05 – 0.45
+        else:  # NEI
+            credibility = 0.35 + raw_score * 0.30   # 0.35 – 0.65
     else:
         avg_confidence = 0.5
         credibility = 0.5
@@ -169,9 +190,20 @@ def score_claim(
         )
 
         result = json.loads(response.text)
+        raw_llm_score = float(result.get("credibility_score", credibility))
+
+        # Clamp LLM output to the valid range for the verdict direction.
+        # This prevents the LLM from returning 1.0 for a REFUTES claim, etc.
+        if verdict == "SUPPORTS":
+            clamped_score = max(0.55, min(0.95, raw_llm_score))
+        elif verdict == "REFUTES":
+            clamped_score = max(0.05, min(0.45, raw_llm_score))
+        else:  # NEI
+            clamped_score = max(0.35, min(0.65, raw_llm_score))
+
         return ScoreResult(
             verdict=verdict,
-            credibility_score=float(result.get("credibility_score", credibility)),
+            credibility_score=round(clamped_score, 2),
             explanation=str(result.get("explanation", fallback_explanation)),
         )
     except Exception as e:
