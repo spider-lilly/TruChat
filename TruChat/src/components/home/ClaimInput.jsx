@@ -13,6 +13,24 @@ const ClaimInput = ({ onSubmitClaim, isSubmitting }) => {
     }
   };
 
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        if (file) {
+          handleAttach({
+            type: "image",
+            value: file.name || "pasted_image.png",
+            file,
+          });
+        }
+      }
+    }
+  };
+
   const hasContent = claimText.trim().length > 0 || attachments.length > 0;
 
   const handleSubmit = () => {
@@ -68,7 +86,8 @@ const ClaimInput = ({ onSubmitClaim, isSubmitting }) => {
         value={claimText}
         onChange={(e) => setClaimText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type or paste any news claim, statement, or headline here..."
+        onPaste={handlePaste}
+        placeholder="Type or paste any news claim, statement, or image here..."
         className="w-full resize-none text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none font-serif leading-relaxed"
       />
 

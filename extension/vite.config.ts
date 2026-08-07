@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 
 function figmaAssetResolver() {
@@ -23,6 +24,14 @@ export default defineConfig({
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
+    // Copy extension manifest and icons into the build output
+    viteStaticCopy({
+      targets: [
+        { src: 'manifest.json', dest: '.' },
+        { src: 'icons/*', dest: 'icons' },
+        // background worker is provided via `public/background.js` (copied automatically)
+      ],
+    }),
   ],
   resolve: {
     alias: {

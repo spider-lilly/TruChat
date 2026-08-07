@@ -129,10 +129,13 @@ export default function App() {
   const [claim, setClaim] = useState("");
   const [attachMode, setAttachMode] = useState(false);
   const [linkValue, setLinkValue] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<Verdict | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (view === "verify" && textareaRef.current && !attachMode) {
@@ -140,10 +143,39 @@ export default function App() {
     }
   }, [view, attachMode]);
 
+  const handleImageSelect = (file: File) => {
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        if (file) {
+          handleImageSelect(file);
+        }
+      }
+    }
+  };
+
   // ── handleVerify: replaced setTimeout mock with real API call ──
 
   async function handleVerify() {
-    if (!claim.trim() && !linkValue.trim()) return;
+    if (!claim.trim() && !linkValue.trim() && !imageFile) return;
 
     setIsAnalyzing(true);
     setResult(null);
@@ -152,11 +184,13 @@ export default function App() {
     const text = claim.trim() || linkValue.trim();
 
     try {
-      // Call the real backend claim-check endpoint.
-      const verdict = await ClaimsService.checkClaim(text);
+      // Call the real backend claim-check endpoint (image or text).
+      const verdict = imageFile
+        ? await ClaimsService.checkClaimWithImage(imageFile, text)
+        : await ClaimsService.checkClaim(text);
 
       // Enrich with client-side region detection (backend doesn't return this).
-      const region = detectRegion(text);
+      const region = detectRegion(text || imageFile?.name || "");
       const enriched: Verdict = {
         ...verdict,
         region,
@@ -408,6 +442,12 @@ export default function App() {
                 setAttachMode={setAttachMode}
                 linkValue={linkValue}
                 setLinkValue={setLinkValue}
+                imageFile={imageFile}
+                imagePreview={imagePreview}
+                onImageSelect={handleImageSelect}
+                onRemoveImage={handleRemoveImage}
+                onPaste={handlePaste}
+                fileInputRef={fileInputRef}
                 isAnalyzing={isAnalyzing}
                 result={result}
                 verifyError={verifyError}
@@ -444,15 +484,22 @@ function DrawerItem({ icon: Icon, label, active, onClick }: { icon: typeof Shiel
 /* ── Verify View ──────────────────────────────────────────── */
 function VerifyView({
   claim, setClaim, attachMode, setAttachMode, linkValue, setLinkValue,
+  imageFile, imagePreview, onImageSelect, onRemoveImage, onPaste, fileInputRef,
   isAnalyzing, result, verifyError, onVerify, onExample, textareaRef,
 }: {
   claim: string; setClaim: (v: string) => void;
   attachMode: boolean; setAttachMode: (v: boolean) => void;
   linkValue: string; setLinkValue: (v: string) => void;
+  imageFile: File | null;
+  imagePreview: string | null;
+  onImageSelect: (file: File) => void;
+  onRemoveImage: () => void;
+  onPaste: (e: React.ClipboardEvent) => void;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   isAnalyzing: boolean; result: Verdict | null;
   verifyError: string | null;
   onVerify: () => void; onExample: (c: string) => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   return (
     <motion.div
@@ -462,6 +509,20 @@ function VerifyView({
       transition={{ duration: 0.18 }}
       className="flex flex-col h-full"
     >
+      {/* Hidden file input for article image upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            onImageSelect(e.target.files[0]);
+            setAttachMode(false);
+          }
+        }}
+      />
+
       {/* Bureau header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <span className="text-[9px] font-semibold tracking-[0.2em] uppercase text-foreground/50">AI Verification Bureau</span>
@@ -478,7 +539,7 @@ function VerifyView({
         </h1>
         {!result && !isAnalyzing && !verifyError && (
           <p className="text-[11px] text-foreground/55 mt-1 leading-relaxed">
-            Paste any headline, article link, or news claim. Our AI will analyse and deliver a credibility verdict.
+            Paste any headline, article link, or news claim (or paste an image directly). Our AI will analyse and deliver a credibility verdict.
           </p>
         )}
       </div>
@@ -606,10 +667,36 @@ function VerifyView({
       {/* Input area */}
       <div className="px-3 pb-3 flex-shrink-0">
         <div className="rounded-xl border border-border bg-card overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
+          
+          {/* Attached image preview pill */}
+          {imagePreview && (
+            <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
+              <div className="flex items-center gap-2 bg-muted/80 px-2.5 py-1.5 rounded-lg border border-border max-w-[85%]">
+                <img src={imagePreview} alt="Attached preview" className="w-8 h-8 object-cover rounded border border-border flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold text-foreground truncate">{imageFile?.name || "Attached image"}</p>
+                  <p className="text-[9px] text-foreground/40">{(imageFile ? (imageFile.size / 1024).toFixed(1) : 0)} KB</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onRemoveImage}
+                className="p-1 rounded-md text-foreground/40 hover:text-foreground hover:bg-muted transition-colors"
+                title="Remove image"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           {attachMode ? (
             <div className="p-3">
               <div className="text-[10px] font-semibold tracking-widest uppercase text-foreground/50 mb-2">Attach Article Image or Link</div>
-              <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-xs text-foreground/50 hover:border-foreground/30 hover:text-foreground/70 transition-colors mb-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border text-xs text-foreground/60 hover:border-foreground/40 hover:text-foreground transition-colors mb-2 bg-muted/30"
+              >
                 <Upload size={13} />
                 Upload Article Image
               </button>
@@ -621,6 +708,7 @@ function VerifyView({
                   className="flex-1 text-xs bg-input-background rounded-lg px-2.5 py-1.5 outline-none border border-transparent focus:border-border placeholder:text-foreground/30"
                 />
                 <button
+                  type="button"
                   onClick={() => setAttachMode(false)}
                   className="px-3 py-1.5 text-xs font-semibold bg-foreground text-primary-foreground rounded-lg hover:opacity-80 transition-opacity"
                 >
@@ -633,8 +721,9 @@ function VerifyView({
               ref={textareaRef}
               value={claim}
               onChange={(e) => setClaim(e.target.value)}
+              onPaste={onPaste}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onVerify(); } }}
-              placeholder="Enter claim for verification…"
+              placeholder="Enter claim for verification or paste image directly…"
               rows={3}
               className="w-full resize-none px-3 pt-3 pb-2 text-xs bg-transparent outline-none placeholder:text-foreground/35 text-foreground leading-relaxed"
             />
@@ -644,16 +733,19 @@ function VerifyView({
           <div className="flex items-center justify-between px-3 py-2 border-t border-border">
             <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 onClick={() => { setAttachMode(!attachMode); }}
                 className={`p-1.5 rounded-md transition-colors ${attachMode ? "bg-muted text-foreground" : "hover:bg-muted text-foreground/50"}`}
+                title="Attach link or upload image"
               >
                 <Paperclip size={13} />
               </button>
               <span className="text-[9px] text-foreground/30">↵ Enter · ⇧↵ New line</span>
             </div>
             <button
+              type="button"
               onClick={onVerify}
-              disabled={isAnalyzing || (!claim.trim() && !linkValue.trim())}
+              disabled={isAnalyzing || (!claim.trim() && !linkValue.trim() && !imageFile)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-foreground text-primary-foreground disabled:opacity-30 hover:opacity-80 transition-all"
             >
               {isAnalyzing ? "Verifying…" : <>Verify Claim <ArrowRight size={11} /></>}

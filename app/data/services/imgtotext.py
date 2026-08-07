@@ -104,6 +104,19 @@ def ocr_space_extract(image_bytes: bytes, mime_type: str) -> str:
     if not api_key:
         raise ValueError("OCR.space API key is not configured in settings.OCRAPI.")
 
+    # Determine extension and filetype parameter so OCR.space recognizes file format
+    ext = mimetypes.guess_extension(mime_type) or ".jpg"
+    if ext == ".jpe":
+        ext = ".jpg"
+
+    file_type_str = ext.lstrip(".").upper()
+    if file_type_str in ["JPG", "JPEG"]:
+        file_type_str = "JPG"
+    elif file_type_str not in ["PNG", "GIF", "WEBP", "PDF"]:
+        file_type_str = "JPG"
+
+    filename = f"image{ext}"
+
     url = "https://api.ocr.space/parse/image"
     payload = {
         "apikey": api_key,
@@ -112,9 +125,10 @@ def ocr_space_extract(image_bytes: bytes, mime_type: str) -> str:
         "detectOrientation": True,
         "scale": True,
         "OCREngine": 2,
+        "filetype": file_type_str,
     }
     files = {
-        "file": ("image", image_bytes, mime_type)
+        "file": (filename, image_bytes, mime_type)
     }
 
     try:
