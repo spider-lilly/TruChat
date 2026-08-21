@@ -1,147 +1,197 @@
-# TruChat - AI Fact-Checking Platform & Verification Bureau
+# 🛡️ TruChat - AI-Powered Fake News Verification Platform
 
-TruChat is a production-grade AI Fact-Checking application featuring a **Django REST Framework** microservice backend and a modern **Vite + React + Tailwind CSS** editorial frontend ("AI Editorial Division" interface).
+> Verify before you trust.
+
+TruChat is an AI-powered web application that helps users detect misinformation by verifying news articles, claims, and online content using advanced Natural Language Processing (NLP), Large Language Models (LLMs), and trusted news sources.
+
+Our goal is to promote digital literacy by providing users with quick, reliable, and easy-to-understand fact-checking results.
 
 ---
 
-## 📁 Repository Structure
+## 🚀 Features
+
+- 🔍 Verify news articles and claims instantly
+- 🤖 AI-powered credibility analysis
+- 📊 Confidence score for each verification
+- 📈 Verification history dashboard
+- 🖼️ Image upload support (OCR-ready)
+- 🔐 Secure JWT Authentication
+- 🌐 Google OAuth Login
+- 🔄 Forgot Password & Reset Password
+- 👤 User Profile Management
+- 📱 Responsive and modern interface
+
+---
+
+## 🧠 Problem Statement
+
+The rapid spread of fake news and misinformation across social media has made it difficult for users to distinguish between factual and misleading information.
+
+TruChat aims to solve this problem by providing an accessible AI-driven platform that analyzes user-submitted content and presents trustworthy verification results with supporting explanations.
+
+---
+
+## 💡 How It Works
+
+1. User logs into the platform.
+2. Enter a news article, claim, or URL.
+3. Upload an optional supporting image.
+4. AI analyzes the content.
+5. The platform returns:
+   - Credibility Score
+   - Confidence Score
+   - Verification Status
+     - ✅ Verified
+     - ⚠️ Misleading
+     - ❌ Unverified
+   - AI-generated explanation
+6. Every verification is stored in the user's history.
+
+---
+
+## 🏗️ Tech Stack
+
+### Frontend
+
+- React.js
+- Vite
+- Tailwind CSS
+- React Router
+
+### Backend
+
+- Django
+- Django REST Framework
+- JWT Authentication
+
+### AI
+
+- Google Gemini API
+- NLP-based content verification
+
+### Database
+
+- SQLite (Development)
+
+### Authentication
+
+- JWT
+- Google OAuth
+
+---
+
+## 🎨 UI / UX Design
+
+The complete user interface and user experience were carefully designed using **Figma** before development to ensure a clean, responsive, and intuitive workflow.
+
+The design follows a newspaper/editorial-inspired aesthetic focused on readability, accessibility, and user engagement.
+
+---
+
+## 📂 Project Structure
 
 ```
-check/
-├── app/                           # Django REST Framework Backend
-│   ├── config/                    # Settings, ASGI/WSGI, and global URLs
-│   ├── data/                      # Claim processing pipeline, schemas, & models
-│   │   ├── services/
-│   │   │   ├── clean.py           # Text cleaning & HTML/Markdown stripping
-│   │   │   ├── normalize.py       # Claim entity/keyword normalization
-│   │   │   ├── embedding.py       # SentenceTransformer vector embeddings
-│   │   │   ├── search.py          # Multi-source search (Tavily, Wikipedia, Wikidata, GDELT)
-│   │   │   ├── nli.py             # DeBERTa-v3 NLI zero-shot classification
-│   │   │   ├── scoring.py         # Signal-priority verdict aggregation & LLM/rule scoring
-│   │   │   ├── cache.py           # Optional Redis Stack vector cache
-│   │   │   └── pipeline.py        # End-to-end claim check orchestrator
-│   └── user/                      # Authentication & profile management (JWT & Google OAuth)
-├── TruChat/                       # Vite + React + Tailwind CSS Frontend
-├── requirements.txt               # Backend Python dependencies
-├── .gitignore                     # Git exclusion rules
-└── README.md                      # Documentation
+TruChat/
+│
+├── frontend/
+│   ├── src/
+│   ├── components/
+│   ├── pages/
+│   └── assets/
+│
+├── backend/
+│   ├── authentication/
+│   ├── api/
+│   └── manage.py
+│
+└── README.md
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## ⚙️ Installation
 
-### 1. Backend Setup (`app/`)
+### Clone the repository
 
-1. Open a terminal in the project root directory:
-   ```bash
-   # Create Python virtual environment
-   python -m venv venv
-   
-   # Activate virtual environment
-   # Windows:
-   venv\Scripts\activate
-   # Linux/macOS:
-   source venv/bin/activate
+```bash
+git clone https://github.com/FRDARSHIL/TruChat.git
+```
 
-   # Install dependencies
-   pip install -r requirements.txt
+### Frontend
 
-   # Download SpaCy language model (if required)
-   python -m spacy download en_core_web_sm
-   ```
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-2. Configure environment variables in `app/.env`:
-   ```env
-   SECRET_KEY=dev-secret-key-change-in-production
-   DEBUG=True
-   CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+### Backend
 
-   # LLM Provider Configuration (Supports Groq, xAI, OpenAI, Gemini, or OpenRouter)
-   # Groq (Free & Fast):
-   API_KEY=gsk_your_groq_api_key_here
-   LLM_MODEL=llama-3.3-70b-versatile
+```bash
+cd backend
 
-   # Search API Providers
-   TAVILY_API_KEY=your_tavily_api_key_here
+python -m venv venv
 
-   # Optional Redis Vector Cache (Pipeline works automatically if Redis is offline)
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   ```
+# Activate Virtual Environment
 
-3. Run migrations and start the Django server:
-   ```bash
-   cd app
-   python manage.py migrate
-   python manage.py runserver 8000
-   ```
-   The backend API will run at `http://127.0.0.1:8000/api/`.
+# Windows
+venv\Scripts\activate
+
+# Linux / macOS
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+python manage.py migrate
+
+python manage.py runserver
+```
 
 ---
 
-### 2. Frontend Setup (`TruChat/`)
+## 📸 Screenshots
 
-1. Open a terminal in the `TruChat/` directory:
-   ```bash
-   cd TruChat
-   npm install
-   ```
-
-2. Configure frontend environment variables in `TruChat/.env`:
-   ```env
-   VITE_API_BASE_URL=http://127.0.0.1:8000/api
-   ```
-
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   The web application will be accessible at `http://localhost:5173`.
+> Add screenshots of the Landing Page, Dashboard, Verification Result, and Profile Page here.
 
 ---
 
-## 🤖 Supported LLM Providers for Fact Scoring
+## 🔮 Future Enhancements
 
-The scoring engine dynamically auto-detects your API key type and routes to the appropriate provider:
-
-| Provider | Key Format | Default Model | Base URL |
-| :--- | :--- | :--- | :--- |
-| **Groq (Free Tier)** | `gsk_...` | `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` |
-| **xAI Grok** | `xai-...` | `grok-2-1212` | `https://api.x.ai/v1` |
-| **Google Gemini** | `AIzaSy...` | `gemini-1.5-flash` | `https://generativelanguage.googleapis.com/v1beta/openai/` |
-| **OpenRouter (Free)** | `sk-or-...` | `meta-llama/llama-3.2-3b-instruct:free` | `https://openrouter.ai/api/v1` |
-| **OpenAI** | `sk-...` | `gpt-4o-mini` | `https://api.openai.com/v1` |
-
-*(Note: If no API key is set or an LLM call fails, the system automatically uses signal-priority NLI rule-based scoring without interrupting request handling.)*
+- Browser Extension
+- Real-time News Monitoring
+- Multi-language Support
+- AI Image Deepfake Detection
+- Community Fact-Checking
+- Citation & Source Verification
+- Mobile Application
 
 ---
 
-## 📡 API Endpoint Reference
+## 👥 Team
 
-### Authentication (`/api/user/`)
-- `POST /api/user/register/`: Register user (`{ email, username, password }`).
-- `POST /api/user/login/`: Obtain JWT access/refresh token pair (`{ email, password }`).
-- `POST /api/user/logout/`: Blacklist token (`{ refresh_token }`).
-- `GET /api/user/profile/`: Fetch profile (`Authorization: Bearer <token>`).
-- `PATCH /api/user/profile/update/`: Update profile details.
-- `POST /api/user/change-password/`: Change password.
-
-### Claim Verification (`/api/data/`)
-- `POST /api/data/claims/check/`: Submit claim text for fact-checking (`{ claim_text: "..." }`).
-  - Response:
-    ```json
-    {
-      "verdict": "SUPPORTS",
-      "confidence_score": 0.94,
-      "credibility_score": 0.83,
-      "explanation": "Based on evaluation of 6 evidence source(s)..."
-    }
-    ```
+- Darshil Agarwal
+- Maulya Shetty
+- Maansi Dasmohapatra
+- Sayan Malik
 
 ---
 
-## 🔒 Production & Security
+## 📄 License
 
-- Environment secrets (`.env`), SQLite databases (`*.sqlite3`), and Node dependencies (`node_modules/`) are strictly excluded via `.gitignore`.
-- Password verification using Django auth handlers and SimpleJWT blacklisting.
+This project was developed for educational and hackathon purposes.
+
+---
+
+## ⭐ Acknowledgements
+
+- Google Gemini API
+- Django REST Framework
+- React
+- Tailwind CSS
+- Vite
+- **Figma** (UI/UX Design)
+- Open Source Community
+
+---
+
+> **"Think Before You Share. Verify Before You Believe."**
