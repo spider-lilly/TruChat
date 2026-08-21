@@ -80,11 +80,27 @@ TruChat aims to solve this problem by providing an accessible AI-driven platform
 
 ---
 
-## 🎨 UI / UX Design
+## 🎨 UI/UX & Design
 
-The complete user interface and user experience were carefully designed using **Figma** before development to ensure a clean, responsive, and intuitive workflow.
+The entire TruChat website UI/UX was designed by **Maulya and Maansi**, covering the complete visual experience and user journey across the platform.
 
-The design follows a newspaper/editorial-inspired aesthetic focused on readability, accessibility, and user engagement.
+The design combines the credibility of a professional **fact-checking and editorial bureau** with the accessibility of a modern AI-powered web application, creating a consistent and intuitive experience throughout TruChat.
+
+### ✨ Design Contributions
+
+- **Complete Website UI/UX:** Designed the entire website interface and user experience across the TruChat platform.
+- **Visual Design System:** Defined the layouts, typography, spacing, visual hierarchy, components, and overall design consistency.
+- **User Experience:** Designed intuitive user flows for claim submission, verification, authentication, and viewing fact-checking results.
+- **Editorial Interface:** Designed the **"AI Editorial Division"** visual experience to establish a professional newsroom/editorial identity.
+- **Responsive Design:** Designed responsive layouts for a consistent experience across different screen sizes.
+- **Authentication & Profile:** Designed the login, registration, profile, and account management interfaces.
+- **Fact-Checking Experience:** Designed the claim submission and verification-result interfaces, including verdicts, confidence scores, credibility scores, and supporting evidence.
+- **Frontend Implementation:** The UI/UX designs were translated into the production frontend using **React, Vite, and Tailwind CSS**.
+
+### 👩‍🎨 UI/UX Credits
+
+**UI/UX Design:** Maulya & Maansi  
+**Frontend Implementation:** TruChat Development Team
 
 ---
 
