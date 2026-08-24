@@ -51,6 +51,11 @@ TruChat aims to solve this problem by providing an accessible AI-driven platform
 
 ## 🏗️ Tech Stack
 
+### Design
+
+- Figma Make
+- Canva
+
 ### Frontend
 
 - React.js
