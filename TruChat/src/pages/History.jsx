@@ -4,9 +4,6 @@ import RightPanel from "../components/home/RightPanel";
 import Footer from "../components/ui/Footer";
 import HistorySection from "../components/home/HistorySection";
 
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2974105923871330"
-     crossorigin="anonymous"></script>
-
 const History = () => {
   return (
     <div className="min-h-screen bg-[#F7F4ED] text-neutral-900 selection:bg-red-200 selection:text-red-900">
