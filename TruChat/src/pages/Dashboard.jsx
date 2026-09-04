@@ -5,6 +5,9 @@ import MainContent from "../components/home/MainContent";
 import RightPanel from "../components/home/RightPanel";
 import Footer from "../components/ui/Footer";
 
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2974105923871330"
+     crossorigin="anonymous"></script>
+
 const Dashboard = () => {
   const [verdictCounts, setVerdictCounts] = useState(() => {
     const saved = localStorage.getItem("verdictCounts");
