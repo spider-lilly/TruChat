@@ -4,6 +4,7 @@ import Sidebar from "../components/ui/Sidebar";
 import MainContent from "../components/home/MainContent";
 import RightPanel from "../components/home/RightPanel";
 import Footer from "../components/ui/Footer";
+import AdBanner from "./components/AdBanner";
 
 const Dashboard = () => {
   const [verdictCounts, setVerdictCounts] = useState(() => {
@@ -49,6 +50,7 @@ const Dashboard = () => {
         </main>
 
         {/* Footer */}
+        <AdBanner />
         <Footer />
       </div>
     </div>
