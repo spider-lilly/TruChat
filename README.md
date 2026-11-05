@@ -215,6 +215,6 @@ This project was developed for educational and hackathon purposes.
 - **Figma** (UI/UX Design)
 - Open Source Community
 
----
+----
 
 > **"Think Before You Share. Verify Before You Believe."**
